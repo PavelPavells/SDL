@@ -32,6 +32,15 @@ class LTexture
 		//Deallocates texture
 		void free();
 
+		//Set color modulation
+		void setColor(Uint8 red, Uint8 green, Uint8 blue);
+
+		//Set Blending
+		void setBlendMode(SDL_BlendMode blending);
+
+		//Set alpha modulation
+		void setAlpha(Uint8 alpha);
+
 		//Renders texture at given point
 		void render( int x, int y, SDL_Rect* clip = NULL );
 
@@ -63,9 +72,9 @@ SDL_Window* gWindow = NULL;
 //The window renderer
 SDL_Renderer* gRenderer = NULL;
 
-//Scene sprites
-SDL_Rect gSpriteClips[ 4 ];
-LTexture gSpriteSheetTexture;
+//Scene texture
+LTexture gModulatedTexture;
+LTexture gBackgroundTexture;
 
 
 LTexture::LTexture()
@@ -135,6 +144,21 @@ void LTexture::free()
 	}
 }
 
+void LTexture::setColor(Uint8 red, Uint8 green, Uint8 blue) {
+	//Modulate texture
+	SDL_SetTextureColorMod(mTexture, red, green, blue);
+}
+
+void LTexture::setBlendMode( SDL_BlendMode blending ) {
+	//Set blending function
+	SDL_SetTextureBlendMode( mTexture, blending );
+}
+
+void LTexture::setAlpha(Uint8 alpha) {
+	//Modulate texture alpha
+	SDL_SetTextureAlphaMod(mTexture, alpha);
+}
+
 void LTexture::render( int x, int y, SDL_Rect* clip )
 {
 	//Set rendering space and render to screen
@@ -143,8 +167,8 @@ void LTexture::render( int x, int y, SDL_Rect* clip )
 	//Set clip rendering dimensions
 	if( clip != NULL )
 	{
-		renderQuad.w = clip->w;
-		renderQuad.h = clip->h;
+		renderQuad.w = clip -> w;
+		renderQuad.h = clip -> h;
 	}
 
 	//Render to screen
@@ -181,7 +205,14 @@ bool init()
 		}
 
 		//Create window
-		gWindow = SDL_CreateWindow( "SDL Tutorial", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN );
+		gWindow = SDL_CreateWindow(
+					"SDL Tutorial",
+					SDL_WINDOWPOS_UNDEFINED,
+					SDL_WINDOWPOS_UNDEFINED,
+					SCREEN_WIDTH,
+					SCREEN_HEIGHT,
+					SDL_WINDOW_SHOWN
+				);
 		if( gWindow == NULL )
 		{
 			printf( "Window could not be created! SDL Error: %s\n", SDL_GetError() );
@@ -221,36 +252,19 @@ bool loadMedia()
 	bool success = true;
 
 	//Load sprite sheet texture
-	if( !gSpriteSheetTexture.loadFromFile( "../dots.png" ) )
+	if( !gModulatedTexture.loadFromFile( "../fadeout.png" ) )
 	{
-		printf( "Failed to load sprite sheet texture!\n" );
+		printf( "Failed to load colors texture!\n" );
 		success = false;
+	} else {
+		//Set standardalpha blending
+		gModulatedTexture.setBlendMode(SDL_BLENDMODE_BLEND);
 	}
-	else
-	{
-		//Set top left sprite
-		gSpriteClips[ 0 ].x =   0;
-		gSpriteClips[ 0 ].y =   0;
-		gSpriteClips[ 0 ].w = 100;
-		gSpriteClips[ 0 ].h = 100;
 
-		//Set top right sprite
-		gSpriteClips[ 1 ].x = 100;
-		gSpriteClips[ 1 ].y =   0;
-		gSpriteClips[ 1 ].w = 100;
-		gSpriteClips[ 1 ].h = 100;
-
-		//Set bottom left sprite
-		gSpriteClips[ 2 ].x =   0;
-		gSpriteClips[ 2 ].y = 100;
-		gSpriteClips[ 2 ].w = 100;
-		gSpriteClips[ 2 ].h = 100;
-
-		//Set bottom right sprite
-		gSpriteClips[ 3 ].x = 100;
-		gSpriteClips[ 3 ].y = 100;
-		gSpriteClips[ 3 ].w = 100;
-		gSpriteClips[ 3 ].h = 100;
+	//Load background texture
+	if( !gBackgroundTexture.loadFromFile( "../fadein.png" ) ) {
+		printf("Failed to load background texture\n");
+		success = false;
 	}
 
 	return success;
@@ -259,7 +273,8 @@ bool loadMedia()
 void close()
 {
 	//Free loaded images
-	gSpriteSheetTexture.free();
+	gModulatedTexture.free();
+	gBackgroundTexture.free();
 
 	//Destroy window
 	SDL_DestroyRenderer( gRenderer );
@@ -294,6 +309,9 @@ int main( int argc, char* args[] )
 			//Event handler
 			SDL_Event e;
 
+			//Modulation components
+			Uint8 a = 255;
+
 			//While application is running
 			while( !quit )
 			{
@@ -305,23 +323,44 @@ int main( int argc, char* args[] )
 					{
 						quit = true;
 					}
+					//handle key press
+					else if(e.type == SDL_KEYDOWN) {
+						//Increase alpha on w
+						if(e.key.keysym.sym == SDLK_w) {
+							//Cap if over 255
+							if(a + 32 > 255) {
+								a = 255;
+							}
+							//Increment otherwise
+							else {
+								a += 32;
+							}
+						}
+						//Decrease alpha on s
+						else if(e.key.keysym.sym == SDLK_s) {
+							//Cap if below 0
+							if(a - 32 < 0) {
+								a = 0;
+							}
+							//Decrement otherwise
+							else {
+								a -= 32;
+							}
+						}
+					}
+
 				}
 
 				//Clear screen
 				SDL_SetRenderDrawColor( gRenderer, 0xFF, 0xFF, 0xFF, 0xFF );
 				SDL_RenderClear( gRenderer );
 
-				//Render top left sprite
-				gSpriteSheetTexture.render( 0, 0, &gSpriteClips[ 0 ] );
+				//Render background
+				gBackgroundTexture.render(0, 0);
 
-				//Render top right sprite
-				gSpriteSheetTexture.render( SCREEN_WIDTH - gSpriteClips[ 1 ].w, 0, &gSpriteClips[ 1 ] );
-
-				//Render bottom left sprite
-				gSpriteSheetTexture.render( 0, SCREEN_HEIGHT - gSpriteClips[ 2 ].h, &gSpriteClips[ 2 ] );
-
-				//Render bottom right sprite
-				gSpriteSheetTexture.render( SCREEN_WIDTH - gSpriteClips[ 3 ].w, SCREEN_HEIGHT - gSpriteClips[ 3 ].h, &gSpriteClips[ 3 ] );
+				//Render front blended
+				gModulatedTexture.setAlpha(a);
+				gModulatedTexture.render(0, 0);
 
 				//Update screen
 				SDL_RenderPresent( gRenderer );
