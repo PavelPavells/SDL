@@ -4,6 +4,7 @@ and may not be redistributed without written permission.*/
 //Using SDL, SDL_image, standard IO, and, strings
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL_ttf.h>
 #include <stdio.h>
 #include <iostream>
 #include <string>
@@ -17,8 +18,7 @@ const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
 //Texture wrapper class
-class LTexture
-{
+class LTexture {
 	public:
 		//Initializes variables
 		LTexture();
@@ -42,7 +42,7 @@ class LTexture
 		void setAlpha(Uint8 alpha);
 
 		//Renders texture at given point
-		void render( int x, int y, SDL_Rect* clip = NULL );
+		void render( int x, int y, SDL_Rect* clip = NULL, double angle = 0.0, SDL_Point* center = NULL, SDL_RendererFlip flip = SDL_FLIP_NONE );
 
 		//Gets image dimensions
 		int getWidth();
@@ -72,11 +72,8 @@ SDL_Window* gWindow = NULL;
 //The window renderer
 SDL_Renderer* gRenderer = NULL;
 
-//Walking animation
-const int WALKING_ANIMATION_FRAMES = 4;
-SDL_Rect gSpriteClips[ WALKING_ANIMATION_FRAMES ];
-
-LTexture gSpriteSheetTexture;
+//Scene texture
+LTexture gArrowTexture;
 
 
 LTexture::LTexture()
@@ -161,7 +158,7 @@ void LTexture::setAlpha(Uint8 alpha) {
 	SDL_SetTextureAlphaMod(mTexture, alpha);
 }
 
-void LTexture::render( int x, int y, SDL_Rect* clip )
+void LTexture::render( int x, int y, SDL_Rect* clip, double angle, SDL_Point* center, SDL_RendererFlip flip )
 {
 	//Set rendering space and render to screen
 	SDL_Rect renderQuad = { x, y, mWidth, mHeight };
@@ -174,7 +171,7 @@ void LTexture::render( int x, int y, SDL_Rect* clip )
 	}
 
 	//Render to screen
-	SDL_RenderCopy( gRenderer, mTexture, clip, &renderQuad );
+	SDL_RenderCopyEx( gRenderer, mTexture, clip, &renderQuad, angle, center, flip );
 }
 
 int LTexture::getWidth()
@@ -222,7 +219,7 @@ bool init()
 		}
 		else
 		{
-			//Create renderer for window
+			//Create vsync renderer for window
 			gRenderer = SDL_CreateRenderer( gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC );
 			if( gRenderer == NULL )
 			{
@@ -254,40 +251,17 @@ bool loadMedia()
 	bool success = true;
 
 	//Load sprite sheet texture
-	if(!gSpriteSheetTexture.loadFromFile("../foo.png")) {
+	if(!gArrowTexture.loadFromFile("../arrow.png")) {
 		printf("Failed to load walking animationtexture!\n");
 		success = false;
-	} else {
-		//Set sprite clips
-		gSpriteClips[ 0 ].x =   0;
-		gSpriteClips[ 0 ].y =   0;
-		gSpriteClips[ 0 ].w =  64;
-		gSpriteClips[ 0 ].h = 205;
-
-		gSpriteClips[ 1 ].x =  64;
-		gSpriteClips[ 1 ].y =   0;
-		gSpriteClips[ 1 ].w =  64;
-		gSpriteClips[ 1 ].h = 205;
-
-		gSpriteClips[ 2 ].x = 128;
-		gSpriteClips[ 2 ].y =   0;
-		gSpriteClips[ 2 ].w =  64;
-		gSpriteClips[ 2 ].h = 205;
-
-		gSpriteClips[ 3 ].x = 196;
-		gSpriteClips[ 3 ].y =   0;
-		gSpriteClips[ 3 ].w =  64;
-		gSpriteClips[ 3 ].h = 205;
-
 	}
-
 	return success;
 }
 
 void close()
 {
 	//Free loaded images
-	gSpriteSheetTexture.free();
+	gArrowTexture.free();
 
 	//Destroy window
 	SDL_DestroyRenderer( gRenderer );
@@ -321,8 +295,11 @@ int main( int argc, char* args[] ) {
 			//Event handler
 			SDL_Event e;
 
-			//Current animation frame
-			int frame = 0;
+			//Angle of rotation
+			double degrees = 0;
+
+			//FLip type
+			SDL_RendererFlip flipType = SDL_FLIP_NONE;
 
 			//While application is running
 			while( !quit )
@@ -334,6 +311,24 @@ int main( int argc, char* args[] ) {
 					if( e.type == SDL_QUIT )
 					{
 						quit = true;
+					} else if(e.type == SDL_KEYDOWN) {
+						switch(e.key.keysym.sym) {
+							case SDLK_a:
+								degrees -= 60;
+								break;
+							case SDLK_d:
+								degrees += 60;
+								break;
+							case SDLK_q:
+								flipType = SDL_FLIP_HORIZONTAL;
+								break;
+							case SDLK_w:
+								flipType = SDL_FLIP_NONE;
+								break;
+							case SDLK_e:
+								flipType = SDL_FLIP_VERTICAL;
+								break;
+						}
 					}
 				}
 
@@ -341,21 +336,11 @@ int main( int argc, char* args[] ) {
 				SDL_SetRenderDrawColor( gRenderer, 0xFF, 0xFF, 0xFF, 0xFF );
 				SDL_RenderClear( gRenderer );
 
-				//Render current frame
-				SDL_Rect* currentClip = &gSpriteClips[ frame / 4 ];
-				gSpriteSheetTexture.render( ( SCREEN_WIDTH - currentClip -> w ) / 2, ( SCREEN_HEIGHT - currentClip -> h ) / 2, currentClip );
+				//Render arrow
+				gArrowTexture.render( ( SCREEN_WIDTH - gArrowTexture.getWidth() ) / 2, ( SCREEN_HEIGHT - gArrowTexture.getHeight() ) / 2, NULL, degrees, NULL, flipType );
 
 				//Update screen
 				SDL_RenderPresent( gRenderer );
-
-				//Go to next frame
-				++frame;
-
-				//Cycle animation
-				if( frame / 4 >= WALKING_ANIMATION_FRAMES )
-				{
-					frame = 0;
-				}
 			}
 		}
 	}
